@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>WA COVID-19 Case Rate (per 10k)</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+
+    <!-- Mapbox -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+
+    <style>
+        h2, h3 { margin: 10px; font-size: 18px; }
+        h3 { font-size: 16px; }
+        p { margin: 10px; }
+
+        #map {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 100%; height: 100%;
+        }
+
+        .map-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            background: rgba(255,255,255,0.85);
+            border: 1px solid rgba(0,0,0,0.2);
+            margin-left: 20px;
+            overflow: auto;
+            border-radius: 3px;
+            font-family: Arial, sans-serif;
+        }
+
+        #features {
+            top: 0;
+            height: 120px;
+            margin-top: 20px;
+            width: 260px;
+        }
+
+        #legend {
+            padding: 10px;
+            height: 200px;
+            width: 160px;
+            margin-bottom: 40px;
+        }
+
+        .legend-key {
+            display: inline-block;
+            border-radius: 20%;
+            width: 12px;
+            height: 12px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+<div id="map"></div>
+
+<div class='map-overlay' id='features'>
+    <h2>WA COVID-19 Case Rate</h2>
+    <div id='text-description'>
+        <p>Hover over a county!</p>
+    </div>
+</div>
+
+<div class='map-overlay' id='legend'></div>
+
+<script>
+    // Your Mapbox token
+    mapboxgl.accessToken = 'pk.eyJ1IjoibWVnY2hldSIsImEiOiJjbWhkemdkaWwwOGx0Mm1wdWxkbDg4NHI5In0.WSCNQHpd1COzO4oj5OQ8dg';
+
+    // Initialize map centered on Washington State
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/light-v10',
+        center: [-120.5, 47.3],
+        zoom: 6
+    });
+
+    async function geojsonFetch() {
+        let response = await fetch('assets/wa-covid-data-102521.geojson');
+        let covid = await response.json();
+
+        map.on('load', () => {
+
+            // Add data source
+            map.addSource('covid', {
+                type: 'geojson',
+                data: covid
+            });
+
+            // Add choropleth layer
+            map.addLayer({
+                id: 'covid-layer',
+                type: 'fill',
+                source: 'covid',
+                paint: {
+                    'fill-color': [
+                        'step',
+                        ['get', 'casePer10k'],   // <<< ATTRIBUTE NAME HERE
+                        '#FFEDA0',
+                        500,   '#FED976',
+                        1000,  '#FEB24C',
+                        1500,  '#FD8D3C',
+                        2000,  '#FC4E2A',
+                        2500,  '#E31A1C',
+                        3000,  '#BD0026',
+                        3500,  '#800026'
+                    ],
+                    'fill-opacity': 0.8,
+                    'fill-outline-color': '#BBBBBB'
+                }
+            });
+
+            // Legend
+            const legendLabels = [
+                '0–499',
+                '500–999',
+                '1000–1499',
+                '1500–1999',
+                '2000–2499',
+                '2500–2999',
+                '3000–3499',
+                '3500+'
+            ];
+
+            const legendColors = [
+                '#FFEDA070',
+                '#FED97670',
+                '#FEB24C70',
+                '#FD8D3C70',
+                '#FC4E2A70',
+                '#E31A1C70',
+                '#BD002670',
+                '#80002670'
+            ];
+
+            const legend = document.getElementById('legend');
+            legend.innerHTML = "<b>Case Rate<br>(per 10k people)</b><br><br>";
+
+            legendLabels.forEach((label, i) => {
+                const item = document.createElement('div');
+                const key = document.createElement('span');
+                key.className = 'legend-key';
+                key.style.backgroundColor = legendColors[i];
+
+                const value = document.createElement('span');
+                value.innerHTML = label;
+
+                item.appendChild(key);
+                item.appendChild(value);
+                legend.appendChild(item);
+            });
+        });
+
+        // Hover interaction
+        map.on('mousemove', (event) => {
+            const county = map.queryRenderedFeatures(event.point, {
+                layers: ['covid-layer']
+            });
+
+            document.getElementById('text-description').innerHTML = county.length
+                ? `<h3>${county[0].properties.name}</h3>
+                   <p><strong>${county[0].properties.casePer10k}</strong> cases per 10k</p>`
+                : `<p>Hover over a county!</p>`;
+        });
+    }
+
+    geojsonFetch();
+</script>
+</body>
+</html>
